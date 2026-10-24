@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FileSpace | Admin Dashboard</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div class="brand"><div class="mark admin-mark">A</div><div><strong>FileSpace Admin</strong><small>User access control</small></div></div>
+      <div class="right"><span class="role-badge">Administrator</span><span id="adminLabel"></span><button id="adminLogout" class="ghost">Sign out</button></div>
+    </header>
+    <section id="adminDashboard" class="hidden">
+      <div class="hero"><div><div class="eyebrow">ADMIN DASHBOARD</div><h1>User management</h1><p>Approve new registrations and block or restore access instantly.</p></div><button id="adminRefresh" class="secondary">↻ Refresh</button></div>
+      <div class="stats-grid">
+        <div class="panel stat-card"><span>Total users</span><strong id="totalUsers">0</strong></div>
+        <div class="panel stat-card pending"><span>Pending</span><strong id="pendingUsers">0</strong></div>
+        <div class="panel stat-card approved"><span>Approved</span><strong id="approvedUsers">0</strong></div>
+        <div class="panel stat-card blocked"><span>Blocked</span><strong id="blockedUsers">0</strong></div>
+      </div>
+      <section class="panel admin-panel">
+        <div class="listHead"><div><h2>Registered users</h2><p>Status changes apply to active sessions immediately</p></div><div class="resource-count"><span id="fileTotal">0 files</span><span id="folderTotal">0 folders</span></div></div>
+        <div class="user-table-wrap">
+          <table class="user-table"><thead><tr><th>User</th><th>Registered</th><th>Status</th><th>Actions</th></tr></thead><tbody id="userRows"></tbody></table>
+          <div id="noUsers" class="empty hidden">No users have registered.</div>
+        </div>
+      </section>
+    </section>
+    <div id="toast" role="status" aria-live="polite" class="toast hidden"></div>
+  </main>
+  <script src="/admin.js" defer></script>
+</body>
+</html>

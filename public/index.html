@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FileSpace | User Portal</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div class="brand"><div class="mark">◈</div><div><strong>FileSpace</strong><small>Secure document portal</small></div></div>
+      <div class="right">
+        <div id="storageWidget" class="storage-widget hidden">
+          <div class="storage-info"><span id="storageLabel">Loading storage…</span><span id="storagePercent">—</span></div>
+          <div class="storage-bar"><div id="storageUsed" class="storage-fill"></div></div>
+        </div>
+        <span id="userLabel"></span><button id="logout" class="ghost hidden">Sign out</button>
+      </div>
+    </header>
+
+    <section id="authView" class="login panel">
+      <div class="auth-tabs" role="tablist">
+        <button id="loginTab" class="auth-tab active" type="button">Sign in</button>
+        <button id="registerTab" class="auth-tab" type="button">Create account</button>
+      </div>
+      <div id="loginPane">
+        <div class="eyebrow">WELCOME BACK</div>
+        <h1>Access your files.</h1>
+        <p>Approved users can open their private document workspace.</p>
+        <form id="loginForm">
+          <label>Username<input required id="username" autocomplete="username" placeholder="Enter username"></label>
+          <label>Password<input required id="password" type="password" autocomplete="current-password" placeholder="Enter password"></label>
+          <button class="primary" type="submit">Access workspace →</button>
+        </form>
+      </div>
+      <div id="registerPane" class="hidden">
+        <div class="eyebrow">REQUEST ACCESS</div>
+        <h1>Create an account.</h1>
+        <p>Your account will remain pending until an administrator approves it.</p>
+        <form id="registerForm">
+          <label>Username<input required id="newUsername" minlength="3" maxlength="32" autocomplete="username" placeholder="Choose username"></label>
+          <label>Password<input required id="newPassword" minlength="8" maxlength="128" type="password" autocomplete="new-password" placeholder="At least 8 characters"></label>
+          <button class="primary" type="submit">Submit for approval →</button>
+        </form>
+      </div>
+      <div id="authMessage" class="approval-note hidden"></div>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <div class="hero">
+        <div><div class="eyebrow">USER DASHBOARD</div><h1>My files</h1><p>Your private folders and documents across the combined storage pool.</p></div>
+        <div class="counter"><strong id="itemCount">0</strong><span>Items here</span></div>
+      </div>
+      <div class="workspace-toolbar panel">
+        <button id="backFolder" class="secondary" disabled>← Back</button>
+        <div class="breadcrumb"><span>Location</span><strong id="folderPath">My files</strong></div>
+        <form id="folderForm" class="folder-form"><input id="folderName" required maxlength="80" placeholder="New folder name"><button class="secondary" type="submit">+ New folder</button></form>
+      </div>
+      <div class="layout">
+        <section class="panel uploader">
+          <div class="uicon">↥</div><h2>Upload a file</h2><p>Upload into the folder currently open</p>
+          <form id="uploadForm">
+            <label for="fileInput" class="drop" id="drop"><span class="uploadSymbol">+</span><strong>Choose a document</strong><span id="selected">PDF, images, text, Word and Excel · Up to 10 MB</span></label>
+            <input id="fileInput" type="file" accept=".pdf,.png,.jpg,.jpeg,.txt,.doc,.docx,.xlsx,.csv" required hidden>
+            <button class="primary" id="uploadBtn" type="submit">Upload document →</button>
+          </form>
+          <p class="fine">Only you can access your uploaded documents.</p>
+        </section>
+        <section class="panel filePanel">
+          <div class="listHead"><div><h2>Folder contents</h2><p>Open folders or manage documents</p></div><button id="refresh" class="secondary">↻ Refresh</button></div>
+          <div id="items" class="files"><div class="empty">This folder is empty.</div></div>
+        </section>
+      </div>
+    </section>
+    <div id="toast" role="status" aria-live="polite" class="toast hidden"></div>
+  </main>
+  <script src="/app.js" defer></script>
+</body>
+</html>
