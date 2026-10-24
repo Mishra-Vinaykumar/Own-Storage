@@ -4,7 +4,7 @@ import express from "express";
 import helmet from "helmet";
 import session from "express-session";
 import rateLimit from "express-rate-limit";
-import multer from "multer";
+import { pipeline } from "node:stream/promises";
 import { StoragePoolError } from "./storage/storage-pool.js";
 import { UserStoreError } from "./user-store.js";
 
@@ -34,6 +34,20 @@ function safeFolderName(value) {
   const name = String(value || "").trim();
   if (!name || name.length > 80 || /[\\/\0]/.test(name)) return null;
   return name;
+}
+
+function safeUploadName(value) {
+  let decoded;
+  try { decoded = decodeURIComponent(String(value || "")); }
+  catch { return null; }
+  const name = path.basename(decoded).trim().slice(0, 160);
+  if (!name || !ALLOWED_EXTENSIONS.has(path.extname(name).toLowerCase())) return null;
+  return name;
+}
+
+function uploadSize(value) {
+  const size = Number(value);
+  return Number.isSafeInteger(size) && size > 0 ? size : null;
 }
 
 export function createApp({ config, store, folderStore, userStore, pool }) {
@@ -216,25 +230,35 @@ export function createApp({ config, store, folderStore, userStore, pool }) {
     catch (error) { next(error); }
   });
 
-  const upload = multer({
-    storage: multer.memoryStorage(), limits: { fileSize: config.maxFileSize, files: 1 },
-    fileFilter: (req, file, callback) => callback(null,
-      ALLOWED_EXTENSIONS.has(path.extname(file.originalname).toLowerCase())),
-  });
-
-  app.post("/api/files", identify, userOnly, uploadLimiter, upload.single("file"), async (req, res, next) => {
-    if (!req.file) return res.status(400).json({
-      error: "Invalid or missing file. Allowed: PDF, images, text and office documents.",
+  app.post("/api/files", identify, userOnly, uploadLimiter, async (req, res, next) => {
+    if ((req.get("content-type") || "").toLowerCase().startsWith("multipart/form-data")) {
+      return res.status(415).json({
+        error: "Send the file as the raw request body with X-File-Name and X-File-Size headers",
+      });
+    }
+    const name = safeUploadName(req.get("x-file-name"));
+    if (!name) return res.status(400).json({
+      error: "Invalid or missing file name. Allowed: PDF, images, text and office documents.",
     });
-    const folderId = requestedFolder(req.body?.folderId);
+    const size = uploadSize(req.get("x-file-size"));
+    if (!size) return res.status(411).json({ error: "X-File-Size must contain the file size in bytes" });
+    if (size > config.maxFileSize) {
+      return res.status(413).json({ error: `Maximum file size is ${config.maxFileSize / 1024 / 1024 / 1024} GB` });
+    }
+    const contentLength = uploadSize(req.get("content-length"));
+    if (contentLength && contentLength !== size) {
+      return res.status(400).json({ error: "X-File-Size does not match Content-Length" });
+    }
+    const folderId = requestedFolder(req.get("x-folder-id"));
     if (!ensureFolder(req.owner, folderId)) return res.status(404).json({ error: "Folder not found" });
     let location;
     try {
-      location = await pool.put(req.file.buffer);
+      location = await pool.putStream(req, size);
       const record = {
         id: randomUUID(), ...location, owner: req.owner, folderId,
-        name: path.basename(req.file.originalname).slice(0, 160), size: req.file.size,
-        type: req.file.mimetype, createdAt: new Date().toISOString(),
+        name, size,
+        type: (req.get("content-type") || "application/octet-stream").split(";")[0].trim().slice(0, 100),
+        createdAt: new Date().toISOString(),
       };
       await store.add(record);
       res.status(201).json({
@@ -257,15 +281,16 @@ export function createApp({ config, store, folderStore, userStore, pool }) {
   app.get("/api/files/:id/content", identify, userOnly, owned, async (req, res, next) => {
     try {
       const record = req.fileRecord;
-      const buffer = await pool.get(record);
+      const stream = await pool.getStream(record);
       const preview = req.query.preview === "1" &&
         new Set(["application/pdf", "image/jpeg", "image/png", "text/plain"]).has(record.type);
       res.set({
         "Content-Type": record.type || "application/octet-stream",
+        "Content-Length": String(record.size),
         "Content-Disposition": `${preview ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(record.name)}`,
         "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
       });
-      res.send(buffer);
+      await pipeline(stream, res);
     } catch (error) { next(error); }
   });
 
@@ -279,13 +304,10 @@ export function createApp({ config, store, folderStore, userStore, pool }) {
 
   app.use((error, req, res, next) => {
     console.error(error);
+    if (res.headersSent) return next(error);
     if (error instanceof UserStoreError) {
       const status = error.code === "USERNAME_EXISTS" ? 409 : error.code === "NOT_FOUND" ? 404 : 400;
       return res.status(status).json({ error: error.message });
-    }
-    if (error instanceof multer.MulterError) {
-      return res.status(400).json({ error: error.code === "LIMIT_FILE_SIZE"
-        ? `Maximum file size is ${config.maxFileSize / 1024 / 1024} MB` : error.message });
     }
     if (error instanceof StoragePoolError) return res.status(503).json({ error: "Storage is temporarily unavailable" });
     res.status(500).json({ error: "Unable to complete request. Check server configuration and logs." });

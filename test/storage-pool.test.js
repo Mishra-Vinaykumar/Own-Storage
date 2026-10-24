@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { StoragePool } from "../src/storage/storage-pool.js";
+import { Readable } from "node:stream";
+import { StoragePool, StoragePoolError } from "../src/storage/storage-pool.js";
 
 test("least-used strategy balances files and records their account", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "storage-pool-"));
@@ -33,4 +34,18 @@ test("least-used strategy balances files and records their account", async (t) =
   assert.deepEqual(await pool.get(first), Buffer.from("12345"));
   await pool.remove(first);
   await assert.rejects(pool.get(first), { code: "ENOENT" });
+});
+
+test("streaming storage rejects a body that does not match its declared size", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "storage-stream-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const directory = path.join(root, "vinay");
+  const pool = new StoragePool({
+    accounts: [{ id: "vinay", driver: "local", directory, capacityBytes: 1000 }],
+    strategy: "least-used",
+    records: () => [],
+  });
+
+  await assert.rejects(pool.putStream(Readable.from([Buffer.from("short")]), 10), StoragePoolError);
+  assert.deepEqual(await fs.readdir(directory), []);
 });

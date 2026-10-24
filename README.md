@@ -13,8 +13,9 @@ untouched.
 - `least-used` (default): uploads to the account with the fewest bytes assigned
   by this API.
 - `round-robin`: rotates between the configured accounts.
-- If the selected account rejects an upload, the pool tries the remaining
-  accounts before returning an error.
+- Before a streaming upload starts, accounts without enough available capacity
+  are skipped. Once the stream starts it cannot be replayed to another account,
+  so an interrupted upload must be retried by the client.
 - The public response never includes the MEGA account id or remote node id.
 
 This creates one virtual pool. It does not literally merge the accounts inside
@@ -87,6 +88,14 @@ MEGA_ANKITA_FOLDER=CRM-Portal-Uploads
 Use `STORAGE_DRIVER=local` with the same account list to test the pool without
 contacting MEGA. Local files go into `storage/<account-id>/`.
 
+Files are streamed through the server instead of being buffered in memory. The
+default maximum is 4.5 GB per file:
+
+```env
+MAX_FILE_SIZE_MB=4608
+UPLOAD_TIMEOUT_HOURS=12
+```
+
 ## Private API authentication
 
 Configure one or more owners and keys:
@@ -101,16 +110,21 @@ or delete another customer's files.
 Example upload in PowerShell:
 
 ```powershell
+$file = Get-Item "C:\path\document.pdf"
 curl.exe -X POST http://localhost:3000/api/files `
   -H "Authorization: Bearer YOUR_KEY" `
-  -F "file=@C:\path\document.pdf"
+  -H "Content-Type: application/pdf" `
+  -H "X-File-Name: document.pdf" `
+  -H "X-File-Size: $($file.Length)" `
+  --data-binary "@$($file.FullName)"
 ```
 
 Endpoints:
 
 - `GET /api/health` - service status and configured account count
 - `GET /api/files` - list the authenticated owner's files
-- `POST /api/files` - upload multipart field `file`
+- `POST /api/files` - stream the raw file body with `X-File-Name` and
+  `X-File-Size` headers; use `X-Folder-Id` when uploading into a folder
 - `GET /api/files/:id/content` - download
 - `GET /api/files/:id/content?preview=1` - inline preview when supported
 - `DELETE /api/files/:id` - permanently delete
@@ -133,6 +147,6 @@ Browser sessions use `POST /api/login`, `GET /api/me`, and `POST /api/logout`.
 This is a working prototype, not yet a public SaaS. MEGAJS is unofficial. Before
 giving the service to untrusted customers, replace JSON metadata and the memory
 session store with a database-backed design, hash customer API keys, add HTTPS,
-CSRF protection, per-customer quotas, audit logging, malware scanning, streaming
-uploads/downloads, backups, and stronger rate limits. Never expose `.env` or the
+CSRF protection, per-customer quotas, audit logging, malware scanning, resumable
+uploads, backups, and stronger rate limits. Never expose `.env` or the
 MEGA account credentials.

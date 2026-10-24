@@ -100,9 +100,14 @@ export function loadConfig(env = process.env, root = process.cwd()) {
     sessionSecret: env.SESSION_SECRET,
     trustProxy: env.TRUST_PROXY === "true",
     maxFileSize:
-      positiveNumber(env.MAX_FILE_SIZE_MB, 10, "MAX_FILE_SIZE_MB") *
+      positiveNumber(env.MAX_FILE_SIZE_MB, 4608, "MAX_FILE_SIZE_MB") *
       1024 *
       1024,
+    uploadTimeout:
+      positiveNumber(env.UPLOAD_TIMEOUT_HOURS, 12, "UPLOAD_TIMEOUT_HOURS") *
+      60 *
+      60 *
+      1000,
     metadataFile: path.join(root, "data", "files.json"),
     folderMetadataFile: path.join(root, "data", "folders.json"),
     userMetadataFile: path.join(root, "data", "users.json"),

@@ -7,8 +7,8 @@ node_modules/
 !.env.example
 
 # Runtime metadata and uploaded files
-data/
-storage/
+/data/
+/storage/
 
 # Build and test output
 dist/

@@ -1,4 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
+const MAX_UPLOAD_BYTES = 4.5 * 1024 ** 3;
+const UPLOAD_DESCRIPTION = "PDF, images, text, Word and Excel · Up to 4.5 GB";
 let current = null;
 let currentFolder = null;
 let folderTrail = [];
@@ -18,6 +20,34 @@ async function api(url, options = {}) {
   try { data = await response.json(); } catch { data = {}; }
   if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
   return data;
+}
+
+function uploadFile(file, folderId, onProgress) {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", "/api/files");
+    request.withCredentials = true;
+    request.responseType = "json";
+    request.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    request.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
+    request.setRequestHeader("X-File-Size", String(file.size));
+    if (folderId) request.setRequestHeader("X-Folder-Id", folderId);
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+    };
+    request.upload.onload = () => onProgress(null);
+    request.onload = () => {
+      let result = request.response;
+      if (!result) {
+        try { result = JSON.parse(request.responseText); } catch { result = {}; }
+      }
+      if (request.status >= 200 && request.status < 300) resolve(result);
+      else reject(new Error(result?.error || `Upload failed (${request.status})`));
+    };
+    request.onerror = () => reject(new Error("Upload connection failed"));
+    request.onabort = () => reject(new Error("Upload cancelled"));
+    request.send(file);
+  });
 }
 
 function niceSize(bytes) {
@@ -226,7 +256,8 @@ $("#folderForm").onsubmit = async (event) => {
 };
 
 $("#fileInput").onchange = () => {
-  $("#selected").textContent = $("#fileInput").files[0]?.name || "PDF, images, text, Word and Excel · Up to 10 MB";
+  const file = $("#fileInput").files[0];
+  $("#selected").textContent = file ? `${file.name} · ${niceSize(file.size)}` : UPLOAD_DESCRIPTION;
 };
 const drop = $("#drop");
 drop.ondragover = (event) => { event.preventDefault(); drop.classList.add("drag"); };
@@ -243,17 +274,16 @@ $("#uploadForm").onsubmit = async (event) => {
   event.preventDefault();
   const file = $("#fileInput").files[0];
   if (!file) return notify("Select a document first");
-  if (file.size > 10 * 1024 * 1024) return notify("Maximum file size is 10 MB");
+  if (file.size > MAX_UPLOAD_BYTES) return notify("Maximum file size is 4.5 GB");
   const button = $("#uploadBtn");
   button.disabled = true;
   button.textContent = "Uploading…";
   try {
-    const data = new FormData();
-    data.append("file", file);
-    if (currentFolder) data.append("folderId", currentFolder);
-    await api("/api/files", { method: "POST", body: data });
+    await uploadFile(file, currentFolder, (percent) => {
+      button.textContent = percent === null ? "Finalizing…" : `Uploading ${percent}%`;
+    });
     $("#fileInput").value = "";
-    $("#selected").textContent = "PDF, images, text, Word and Excel · Up to 10 MB";
+    $("#selected").textContent = UPLOAD_DESCRIPTION;
     notify("Document uploaded successfully");
     loadItems();
     loadStorage();

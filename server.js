@@ -22,9 +22,10 @@ const pool = new StoragePool({
 });
 const app = createApp({ config, store, folderStore, userStore, pool });
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   console.log(
     `Private Storage API listening at http://localhost:${config.port} ` +
       `[${config.driver}, ${config.accounts.length} accounts, ${config.strategy}]`,
   );
 });
+server.requestTimeout = config.uploadTimeout;

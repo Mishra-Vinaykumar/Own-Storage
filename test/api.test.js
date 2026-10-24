@@ -52,9 +52,16 @@ test("Bearer clients can use one API across the storage pool", async (t) => {
   const headers = { Authorization: "Bearer test-key-one" };
 
   for (const [name, contents] of [["one.txt", "12345"], ["two.txt", "123"]]) {
-    const form = new FormData();
-    form.append("file", new Blob([contents], { type: "text/plain" }), name);
-    const response = await fetch(`${base}/api/files`, { method: "POST", headers, body: form });
+    const response = await fetch(`${base}/api/files`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "Content-Type": "text/plain",
+        "X-File-Name": encodeURIComponent(name),
+        "X-File-Size": String(Buffer.byteLength(contents)),
+      },
+      body: contents,
+    });
     assert.equal(response.status, 201);
   }
 
@@ -72,6 +79,22 @@ test("Bearer clients can use one API across the storage pool", async (t) => {
   const removed = await fetch(`${base}/api/files/${files[1].id}`, { method: "DELETE", headers });
   assert.equal(removed.status, 200);
   assert.equal(store.all().length, 1);
+});
+
+test("streaming uploads enforce the configured 4.5 GB limit before reading the body", async (t) => {
+  const { base } = await testService(t);
+  const response = await fetch(`${base}/api/files`, {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer test-key-one",
+      "Content-Type": "application/pdf",
+      "X-File-Name": "large.pdf",
+      "X-File-Size": String(4608 * 1024 * 1024 + 1),
+    },
+    body: "x",
+  });
+  assert.equal(response.status, 413);
+  assert.match((await response.json()).error, /4\.5 GB/);
 });
 
 test("admin approval, blocking and folder access are enforced immediately", async (t) => {
